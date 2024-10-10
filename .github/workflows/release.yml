@@ -1,9 +1,14 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   release:
     types:
       - published
+  workflow_dispatch:
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -113,7 +118,33 @@ jobs:
       base64-subjects: "${{ needs.build.outputs.hashes }}"
       upload-assets: true
 
+  release-test-pypi:
+    # TODO hugovk->sigstore
+    if: |
+      github.repository_owner == 'hugovk'
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+    needs: [build, generate-provenance]
+    runs-on: ubuntu-latest
+    permissions:
+      # Used to authenticate to PyPI via OIDC.
+      id-token: write
+    steps:
+      - name: Download artifacts directories # goes to current working directory
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+
+      - name: publish
+        uses: pypa/gh-action-pypi-publish@f7600683efdcb7656dec5b29656edb7bc586e597 # v1.10.3
+        with:
+          packages-dir: built-packages/
+          attestations: true
+          repository-url: https://test.pypi.org/legacy/
+
   release-pypi:
+    # TODO hugovk->sigstore
+    if: |
+      github.repository_owner == 'hugovk'
+      && github.event.action == 'published'
     needs: [build, generate-provenance]
     runs-on: ubuntu-latest
     permissions:
@@ -130,6 +161,10 @@ jobs:
           attestations: true
 
   release-github:
+    # TODO hugovk->sigstore
+    if: |
+      github.repository_owner == 'hugovk'
+      && github.event.action == 'published'
     needs: [build, generate-provenance]
     runs-on: ubuntu-latest
     permissions:
